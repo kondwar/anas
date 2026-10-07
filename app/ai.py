@@ -23,7 +23,7 @@ Use western digits for phones. Put whatsapp only if the text says the number is 
 lat/lng only if coordinates or a Google Maps link are given. Use null/'' for missing fields."""
 
 ADMIN_SYS = """You convert an admin's Arabic message (may be colloquial or have typos) for a directory bot into ONE JSON command. Return JSON only:
-{"action":"stats|pending|show|approve|approve_all|reject|edit|boost|delete|add_entry|ad_add|ads_list|ad_off|add_admin|remove_admin|list_admins|gh_list|gh_show|gh_edit|gh_delete|deploy|user_search|unknown",
+{"action":"stats|pending|show|approve|approve_all|reject|edit|boost|delete|add_entry|ad_add|ads_list|ad_off|add_admin|remove_admin|list_admins|gh_list|gh_show|gh_edit|gh_delete|deploy|db_size|cleanup|user_search|unknown",
  "ref":"entry id or entry name, or ''",
  "changes":{"name":"","category":"","city":"","address":"","phone":"","whatsapp":"","description":"","lat":"","lng":""},
  "value":0,
@@ -39,6 +39,7 @@ Rules:
 - add_admin/remove_admin: user_id is the numeric Telegram id.
 - gh_*: path is a repo-relative file path (gh_list: a directory or ''). gh_edit: instruction describes the change, or the content of a new file; copy any content the admin supplied verbatim.
 - deploy: publish staged code changes.
+- db_size: show database size. cleanup: delete old search logs; value = days to keep (default 90).
 - If the message is just a normal search for a place or phone number, use user_search."""
 
 EDIT_SYS = """You are a careful senior Python engineer editing one file of an aiogram 3 Telegram bot project.
@@ -147,4 +148,4 @@ async def edit_code(path, source, instruction):
         t = t.split("\n", 1)[1] if "\n" in t else ""
         t = t.rsplit("```", 1)[0]
     return t.rstrip() + "\n"
-              
+ 
