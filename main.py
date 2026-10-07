@@ -1,3 +1,5 @@
+import asyncio
+
 from aiohttp import web
 from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
@@ -14,11 +16,24 @@ dp.include_router(admin)
 dp.include_router(user)
 
 
+_bg = []
+
+
+async def _daily_cleanup():
+    while True:
+        try:
+            await db.cleanup_searches(90)
+        except Exception:
+            pass
+        await asyncio.sleep(86400)
+
+
 async def on_startup(bot: Bot):
     if not BASE_URL:
         raise RuntimeError("WEBHOOK_BASE_URL أو RENDER_EXTERNAL_URL غير متوفر")
     await db.init()
     ADMIN_IDS.update(await db.load_admins())
+    _bg.append(asyncio.create_task(_daily_cleanup()))
     await bot.set_webhook(f"{BASE_URL}/webhook", secret_token=WEBHOOK_SECRET, drop_pending_updates=True)
 
 
@@ -31,3 +46,4 @@ setup_application(app, dp, bot=bot)
 
 if __name__ == "__main__":
     web.run_app(app, host="0.0.0.0", port=PORT)
+    
