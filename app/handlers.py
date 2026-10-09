@@ -113,7 +113,7 @@ def decision_kb(eid):
 @user.message(CommandStart())
 async def start(m: Message):
     await db.touch_user(m.from_user)
-    await m.answer("أهلاً! اكتب ما تبحث عنه بأي لهجة، مثل: رقم مطعم الرحمة بدرعا\nلإضافة مكان: /add")
+    await m.answer("أهلا بك في دليل سوريا الذكي إبحث عن أي شيء تريده بسهولة\nكما يمكنك إضافة بطاقات للأشخاص والأماكن والفعاليات والتعديل عليها من خلال التحدث مع البوت")
 
 
 @user.message(Command("myid"))
