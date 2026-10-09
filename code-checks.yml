@@ -1,0 +1,39 @@
+name: Code checks
+
+on:
+  push:
+    branches: [main, staging]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  python-checks:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest pyflakes
+      - name: Compile Python files
+        run: python -m compileall -q app main.py
+      - name: Static check (informational)
+        continue-on-error: true
+        run: python -m pyflakes app main.py
+      - name: Import smoke test
+        env:
+          BOT_TOKEN: "123456:TEST_TOKEN"
+          DATABASE_URL: "postgresql://u:p@localhost/db"
+          WEBHOOK_BASE_URL: "https://example.invalid"
+        run: python -c "import main"
+      - name: Run tests
+        run: pytest -q
