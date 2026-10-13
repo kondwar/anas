@@ -183,32 +183,56 @@ def _ph_sep(phone: str) -> str:
 def render_html(e, phones, adm=False) -> str:
     v = values(e, phones)
     prof = profession_emoji(e)
+    place = place_emoji(prof)
+    # ── رأس احترافي: اسم بارز مع إيموجي المكان ──
+    header = f"{place} <b>{esc(v['name'])}</b>"
+    subtitle = ""
+    if v["category"] != MISSING:
+        subtitle = f"\n{prof} <i>{esc(v['category'])}</i>"
+    divider = "━━━━━━━━━━━━━━━━━━━━━━"
     rows = [f"{prof} <b>التخصص:</b> {esc(v['category'])}",
             f"📍 <b>العنوان:</b> {esc(v['address'])}",
             f"📞 <b>الهاتف:</b>{_ph_sep(v['phone'])}{esc(v['phone'])}",
             f"⏰ <b>الدوام:</b> {esc(v['hours'])}"]
     if v["description"]:
-        rows.append(f"ℹ️ {esc(v['description'])}")
+        rows.append(f"ℹ️ <i>{esc(v['description'])}</i>")
     stats = [f"👁 {int(e.get('views') or 0)} مشاهدة"]
     if e.get("likes"):
         stats.append(f"👍 {e.get('likes')}")
-    t = (f"{place_emoji(prof)} <b>{esc(v['name'])}</b>\n"
-         f"<blockquote>{chr(10).join(rows)}</blockquote>\n" + "  ·  ".join(stats))
+    stats_line = "  ·  ".join(stats)
+    t = (f"{header}{subtitle}\n"
+         f"{divider}\n"
+         f"<blockquote>{chr(10).join(rows)}</blockquote>\n"
+         f"{divider}\n"
+         f"{stats_line}")
     if e.get("status") == "approved":
-        t += "\n✅ <b>معتمد</b>"
+        t += "\n✅ <b>معتمد</b> ✓"
     if adm:
-        t += f"\n🆔 {e.get('id')} | {e.get('status')} | boost {e.get('boost')} | by {e.get('added_by')}"
+        t += f"\n<code>🆔 {e.get('id')} | {e.get('status')} | boost {e.get('boost')} | by {e.get('added_by')}</code>"
     return t
 
 
 def render_plain(e, phones) -> str:
-    """نص المشاركة (بلا HTML)."""
+    """نص المشاركة (بلا HTML) — تصميم احترافي متناسق مع بطاقة HTML."""
     v = values(e, phones)
     prof = profession_emoji(e)
-    lines = [f"{place_emoji(prof)} {v['name']}", f"{prof} التخصص: {v['category']}",
-             f"📍 العنوان: {v['address']}", f"📞 الهاتف:{_ph_sep(v['phone'])}{v['phone']}", f"⏰ الدوام: {v['hours']}"]
+    place = place_emoji(prof)
+    divider = "━━━━━━━━━━━━━━━━━━━━━━"
+    lines = [f"{place} {v['name']}",
+             f"{prof} {v['category']}",
+             divider,
+             f"📍 العنوان: {v['address']}",
+             f"📞 الهاتف:{_ph_sep(v['phone'])}{v['phone']}",
+             f"⏰ الدوام: {v['hours']}"]
     if v["description"]:
         lines.append(f"ℹ️ {v['description'][:200]}")
+    lines.append(divider)
+    stats = f"👁 {int(e.get('views') or 0)} مشاهدة"
+    if e.get("likes"):
+        stats += f"  ·  👍 {e.get('likes')}"
+    lines.append(stats)
+    if e.get("status") == "approved":
+        lines.append("✅ معتمد ✓")
     return "\n".join(lines)
 
 
