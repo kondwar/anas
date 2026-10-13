@@ -12,6 +12,7 @@
 """
 from __future__ import annotations
 
+import difflib
 import json
 import logging
 import re
@@ -66,6 +67,16 @@ class Compiled:
     min_words: int
     phrases: tuple   # ((tokens, intent), ...) الأطول أولاً
     hints: str
+
+
+def _tok_match(a: str, b: str) -> bool:
+    if a == b:
+        return True
+    if abs(len(a) - len(b)) > 2:
+        return False
+    if len(a) <= 3 or len(b) <= 3:
+        return False
+    return difflib.SequenceMatcher(None, a, b).ratio() >= 0.85
 
 
 def _words(p: str) -> tuple:
@@ -187,7 +198,8 @@ def _best(lex, toks, start, admin):
         k = len(ph)
         if (scope == "admin" and not admin) or k > rest_n:
             continue
-        if tuple(t[1] for t in toks[start:start + k]) != ph:
+        cand = tuple(t[1] for t in toks[start:start + k])
+        if cand != ph and not all(_tok_match(c, p) for c, p in zip(cand, ph)):
             continue
         rest_toks = toks[start + k:]
         rest = " ".join(t[0] for t in rest_toks)
