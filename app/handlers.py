@@ -1678,6 +1678,10 @@ async def dispatch_admin(m: Message, bot: Bot, p: dict):
     if await owner_actions(m, bot, p, act):
         return
 
+    # أي نص غير مفهوم يحتوي اسم شخص/مكان يُعامل كبحث (طلب المستخدم: ذكر الاسم = بحث)
+    if act == "unknown":
+        return await do_search(m, m.text)
+
     await m.answer("ما فهمت الأمر. اكتبه بشكل أوضح أو استخدم /admin لعرض الأوامر.")
 
 
