@@ -164,7 +164,7 @@ async def decide_pending(eid, status):
 
 
 async def find(ref, limit=5):
-    """يبحث برقم السجل أو باسمه، في كل الحالات (منشور/معلق/مرفوض)."""
+    """يبحث برقم السجل أو باسمه، في كل الحالات (منشور/معلق/مرفوض) - مطابقة دقيقة فقط."""
     if str(ref).isdigit():
         r = await get(int(ref))
         return [r] if r else []
@@ -172,11 +172,13 @@ async def find(ref, limit=5):
     if not q:
         return []
     return await pool.fetch(
-        BASE + """ WHERE word_similarity($1,e.search_text)>0.35 OR e.search_text ILIKE '%'||$1||'%'
-        ORDER BY word_similarity($1,e.search_text) DESC LIMIT $2""", q, limit)
+        BASE + """ WHERE e.search_text ILIKE '%'||$1||'%'
+        ORDER BY e.boost DESC, e.views DESC LIMIT $2""", q, limit)
 
 
 async def search(name, category, city, limit=5, keywords=None):
+    # بحث دقيق فقط: مطابقة حرفية للعبارة (ILIKE) بدون تقريب أو مرادفات
+    _ = keywords  # مرادفات AI تُتجاهل عمداً لضمان الدقة
     q = f"{name} {category}".strip() or city
     if not q and not city:
         return []

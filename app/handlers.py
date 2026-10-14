@@ -501,6 +501,10 @@ async def do_search(m: Message, text: str):
         vocab = None
     p = await ai.parse_search(text, vocab)
     rows = await db.search(p["name"], p["category"], p["city"], keywords=p.get("keywords"))
+    # فلترة دقيقة حسب النص الأصلي فقط: لا نتائج تقريبية أو إضافية
+    exact = db.norm(text)
+    if exact:
+        rows = [r for r in rows if exact in db.norm(r["search_text"] or "")]
     await db.log_search(m.from_user.id, text, len(rows))
     if not rows:
         return await m.answer("ما لقيت نتائج. جرّب صياغة ثانية، أو أضف المكان بـ /add")
