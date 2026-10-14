@@ -79,13 +79,13 @@ COMMAND_NLU = """Command conversion:
 - Resolve references from the message only: "#12", "رقم 12" or Arabic digits ("١٢") become ref "12" in western digits; an entry name stays as written in standard spelling (fix typos to standard spelling).
 - If the message holds several actions, return the primary (first) one.
 - Destructive or hard-to-undo actions (delete, gh_delete, deploy, cleanup, approve_all, add_admin, remove_admin) need explicit wording; if the wording is vague or the target is unclear, return "unknown".
-- A question or an ordinary search for a place or phone number is user_search, not an action.
+- A question or an ordinary search for a place, person, business, or phone number — even if it is just a name like "انس العلي" or "مطعم الرحمة" without any search verb — is user_search, not an action.
 - For gh_edit/gh_code, write in "instruction" one clear, self-contained engineering instruction that keeps every detail and constraint the admin stated (fix typos, expand shorthand such as "ضف زر" = add a button) and adds nothing he did not ask for."""
 
 CODE_NLU = """Understanding the request: the instruction is usually colloquial Arabic (any dialect) with possible typos, shorthand or missing details. First work out what is wanted: which feature, file or function is meant (use the repository context to resolve vague names such as "زر الاضافة" or "البحث"), then implement exactly that with the smallest compatible change. Do not widen the scope or refactor unrelated code. If the request is too vague, contradictory, unsafe, or refers to something that does not exist in the repository, make no changes and ask one short clarifying question in Arabic."""
 
 SEARCH_SYS = UNDERSTAND + "\n\n" + """You normalize search queries for an Arabic local directory (Syria/Levant).
-The text may contain spelling mistakes or colloquial dialect. Return JSON only:
+The text may contain spelling mistakes or colloquial dialect. Any mention of a person name, business name, or place name — even if it is just the name alone without words like "search" or "where" (e.g. "انس العلي", "مطعم الرحمة", "صيدلية الشفاء") — is a search query for that name; put the name in the "name" field. Return JSON only:
 {"name":"business/person name or ''","category":"standard Arabic singular noun like مطعم، صيدلية، طبيب، مدرسة or ''","city":"city/area in standard spelling or ''","keywords":["up to 5 other standard Arabic words an entry of this kind may contain"]}
 Drop filler words (رقم، عنوان، وين، بدي، شو).
 "keywords": synonyms and closely related professions/services/specialties, as the entry text would likely write them (e.g. دكتور -> طبيب، عيادة، مركز طبي؛ صيدلاني -> صيدلية؛ ميكانيكي -> ورشة سيارات، تصليح سيارات؛ حلاق -> صالون، حلاقة). Single words or short phrases only; use [] if the query is just a name.
@@ -131,7 +131,7 @@ Rules:
 - gh_*: path is a repo-relative file path (gh_list: a directory or ''). gh_edit: edit one file; gh_code: analyze the repository and implement a compatible multi-file code change using the dedicated coding model.
 - deploy: publish staged code changes.
 - db_size: show database size. cleanup: delete old search logs; value = days to keep (default 90).
-- If the message is just a normal search for a place or phone number, use user_search.""" + NO_INVENT + \
+- If the message is just a normal search for a place, person, business, or phone number — including when it is ONLY a name like "انس العلي" or "مطعم الرحمة" without any verb — use user_search. Any mention of a person or place name without an explicit admin action verb (add/edit/delete/approve...) is user_search, not unknown.""" + NO_INVENT + \
     "\nNever guess an entry id, user id or number that the admin did not write."
 
 EDIT_SYS = CODE_NLU.replace("make no changes and ask one short clarifying question in Arabic", "return the file content unchanged") + """

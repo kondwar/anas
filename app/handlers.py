@@ -3,6 +3,7 @@ import csv
 import difflib
 import html
 import io
+import json
 import logging
 import os
 import re
@@ -501,6 +502,10 @@ async def do_search(m: Message, text: str):
         vocab = None
     p = await ai.parse_search(text, vocab)
     rows = await db.search(p["name"], p["category"], p["city"], keywords=p.get("keywords"))
+    # فلترة دقيقة: النص الأصلي فقط بعد التطبيع يجب أن يكون عبارة كاملة داخل search_text
+    exact = db.norm(text)
+    if exact:
+        rows = [r for r in rows if exact and exact in db.norm(r["search_text"] or "")]
     await db.log_search(m.from_user.id, text, len(rows))
     if not rows:
         return await m.answer("ما لقيت نتائج. جرّب صياغة ثانية، أو أضف المكان بـ /add")
@@ -889,6 +894,102 @@ async def bulk_doc(m: Message, bot: Bot, state: FSMContext):
         text = buf.getvalue().decode("utf-8-sig")
     except UnicodeDecodeError:
         return await m.answer("❌ يجب أن يكون الملف نصاً بترميز UTF-8.")
+    await state.clear()
+    await bulk_process(m, text)
+
+
+def _extract_file_text(data: bytes, filename: str) -> str | None:
+    """يستخرج النص من الملف حسب نوعه. يدعم txt/csv/json/md/html و xlsx/xls و pdf و docx."""
+    name = (filename or "").lower()
+    ext = name.rsplit(".", 1)[-1] if "." in name else ""
+    if ext == "json":
+        try:
+            obj = json.loads(data.decode("utf-8-sig"))
+            if isinstance(obj, list):
+                return "\n".join(json.dumps(x, ensure_ascii=False) if isinstance(x, dict) else str(x) for x in obj)
+            if isinstance(obj, dict) and isinstance(obj.get("entries"), list):
+                return "\n".join(json.dumps(x, ensure_ascii=False) for x in obj["entries"])
+            return data.decode("utf-8-sig")
+        except Exception:
+            try:
+                return data.decode("utf-8-sig")
+            except Exception:
+                return None
+    if ext in ("xlsx", "xls"):
+        try:
+            import openpyxl
+            wb = openpyxl.load_workbook(io.BytesIO(data), read_only=True, data_only=True)
+            lines = []
+            for ws in wb.worksheets:
+                for row in ws.iter_rows(values_only=True):
+                    vals = [str(v).strip() for v in row if v is not None and str(v).strip() != ""]
+                    if vals:
+                        lines.append(" | ".join(vals))
+                    if len(lines) >= 5000:
+                        break
+                if len(lines) >= 5000:
+                    break
+            txt = "\n".join(lines)
+            return txt if txt.strip() else None
+        except Exception:
+            pass
+    if ext == "pdf":
+        try:
+            import PyPDF2
+            reader = PyPDF2.PdfReader(io.BytesIO(data))
+            texts = []
+            for page in reader.pages[:80]:
+                try:
+                    t = page.extract_text() or ""
+                except Exception:
+                    t = ""
+                if t.strip():
+                    texts.append(t)
+            txt = "\n".join(texts)
+            return txt if txt.strip() else None
+        except Exception:
+            pass
+    if ext == "docx":
+        try:
+            import docx
+            doc = docx.Document(io.BytesIO(data))
+            txt = "\n".join(p.text for p in doc.paragraphs if p.text and p.text.strip())
+            return txt if txt.strip() else None
+        except Exception:
+            pass
+    for enc in ("utf-8-sig", "utf-8", "cp1256", "windows-1256"):
+        try:
+            txt = data.decode(enc)
+            if txt.strip():
+                return txt
+        except Exception:
+            continue
+    return None
+
+
+@admin.message(F.document)
+async def auto_file(m: Message, bot: Bot, state: FSMContext):
+    """استقبال تلقائي لأي ملف من الأدمن بدون أوامر: يحلل المحتوى ويحوله لبطاقات."""
+    cap = (m.caption or "").strip()
+    if cap.startswith(("/push", "/import", "/bulk")):
+        return
+    cur_state = await state.get_state()
+    if cur_state in (S.aedit, S.dedit, S.upd, S.preview, S.add):
+        return
+    if m.document.file_size and m.document.file_size > 5_000_000:
+        return await m.answer("⚠️ الملف كبير جداً (الحد 5MB). قسّمه إلى أجزاء أصغر.")
+    buf = io.BytesIO()
+    try:
+        await bot.download(m.document, destination=buf)
+    except Exception:
+        return await m.answer("⚠️ تعذر تحميل الملف، حاول مرة أخرى.")
+    data = buf.getvalue()
+    if not data:
+        return await m.answer("⚠️ الملف فارغ.")
+    filename = m.document.file_name or "file.txt"
+    text = _extract_file_text(data, filename)
+    if not text or not text.strip():
+        return await m.answer("⚠️ لم أستطع قراءة محتوى الملف. تأكد أنه نص أو جدول (CSV/Excel/PDF/Word) بترميز UTF-8، أو حوّله إلى .txt/.csv ثم أعد رفعه.")
     await state.clear()
     await bulk_process(m, text)
 
@@ -1673,6 +1774,10 @@ async def dispatch_admin(m: Message, bot: Bot, p: dict):
 
     if await owner_actions(m, bot, p, act):
         return
+
+    # أي نص غير مفهوم يحتوي اسم شخص/مكان يُعامل كبحث (طلب المستخدم: ذكر الاسم = بحث)
+    if act == "unknown":
+        return await do_search(m, m.text)
 
     await m.answer("ما فهمت الأمر. اكتبه بشكل أوضح أو استخدم /admin لعرض الأوامر.")
 

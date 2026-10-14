@@ -164,7 +164,7 @@ async def decide_pending(eid, status):
 
 
 async def find(ref, limit=5):
-    """يبحث برقم السجل أو باسمه، في كل الحالات (منشور/معلق/مرفوض)."""
+    """يبحث برقم السجل أو باسمه، في كل الحالات (منشور/معلق/مرفوض) - مطابقة دقيقة فقط."""
     if str(ref).isdigit():
         r = await get(int(ref))
         return [r] if r else []
@@ -172,28 +172,23 @@ async def find(ref, limit=5):
     if not q:
         return []
     return await pool.fetch(
-        BASE + """ WHERE word_similarity($1,e.search_text)>0.35 OR e.search_text ILIKE '%'||$1||'%'
-        ORDER BY word_similarity($1,e.search_text) DESC LIMIT $2""", q, limit)
+        BASE + """ WHERE e.search_text ILIKE '%'||$1||'%'
+        ORDER BY e.boost DESC, e.views DESC LIMIT $2""", q, limit)
 
 
 async def search(name, category, city, limit=5, keywords=None):
+    # بحث دقيق فقط: مطابقة حرفية للعبارة (ILIKE) بدون تقريب أو مرادفات أو word_similarity
+    _ = keywords  # مرادفات AI تُتجاهل عمداً لضمان الدقة - لا تظهر نتائج إضافية
     q = f"{name} {category}".strip() or city
+    if not q and not city:
+        return []
     sql = BASE + """ WHERE e.status='approved'
       AND ($2='' OR e.search_text ILIKE '%'||$2||'%')
-      AND (word_similarity($1,e.search_text)>0.35 OR e.search_text ILIKE '%'||$1||'%')
-      ORDER BY e.boost DESC, word_similarity($1,e.search_text) DESC, e.views DESC LIMIT $3"""
+      AND ($1='' OR e.search_text ILIKE '%'||$1||'%')
+      ORDER BY e.boost DESC, e.views DESC LIMIT $3"""
     rows = await pool.fetch(sql, q, city, limit)
     if not rows and city:
         rows = await pool.fetch(sql, q, "", limit)
-    kws = [k for k in (keywords or []) if isinstance(k, str) and k.strip()][:8]
-    if not rows and kws:  # بحث احتياطي بالمرادفات التي اقترحها الـ AI (دكتور → طبيب، عيادة ...)
-        sql2 = BASE + """ WHERE e.status='approved'
-          AND ($2='' OR e.search_text ILIKE '%'||$2||'%')
-          AND e.search_text ILIKE ANY(ARRAY(SELECT '%'||k||'%' FROM unnest($1::text[]) AS k))
-          ORDER BY e.boost DESC, e.views DESC LIMIT $3"""
-        rows = await pool.fetch(sql2, kws, city, limit)
-        if not rows and city:
-            rows = await pool.fetch(sql2, kws, "", limit)
     return rows
 
 
