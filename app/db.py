@@ -177,8 +177,8 @@ async def find(ref, limit=5):
 
 
 async def search(name, category, city, limit=5, keywords=None):
-    # بحث دقيق فقط: مطابقة حرفية للعبارة (ILIKE) بدون تقريب أو مرادفات
-    _ = keywords  # مرادفات AI تُتجاهل عمداً لضمان الدقة
+    # بحث دقيق فقط: مطابقة حرفية للعبارة (ILIKE) بدون تقريب أو مرادفات أو word_similarity
+    _ = keywords  # مرادفات AI تُتجاهل عمداً لضمان الدقة - لا تظهر نتائج إضافية
     q = f"{name} {category}".strip() or city
     if not q and not city:
         return []

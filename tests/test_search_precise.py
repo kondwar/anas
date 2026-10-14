@@ -39,7 +39,7 @@ def test_search_ignores_keywords(monkeypatch):
         # لو كان البحث بالمرادفات موجوداً لاستُدعي مرة ثانية مع keywords
         # هنا نعيد فارغاً للاستعلام الأول فقط
         return []
-    mock_pool.fetch = fake_fetch
+    mock_pool.fetch = AsyncMock(side_effect=fake_fetch)
     monkeypatch.setattr(db, "pool", mock_pool)
     rows = asyncio.run(db.search("دكتور", "", "", limit=5, keywords=["طبيب", "عياده"]))
     # يجب ألا يتم استخدام keywords، لذا النتيجة تبقى فارغة ولا يتم توسيعها
